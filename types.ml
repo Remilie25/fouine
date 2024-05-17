@@ -64,7 +64,7 @@ let ( && ) a b = match a,b with
   |Vb(k),Vb(l) -> Vb(k&&l)
   |_,_ -> raise NotAllowedOperation;;
 
-let not a = match a with
+let vnot a = match a with
   |Vb(k) -> Vb(not(k))
   |_ -> raise NotAllowedOperation;;
 
@@ -96,8 +96,8 @@ let test =
   Vb(true) || Vb(false);
   Vb(true) && Vb (false);
   Vb(true) && Vb(true);
-  not(Vb(true));
-  not(Vb(false));
+  vnot(Vb(true));
+  vnot(Vb(false));
   Vb(default_equal "abc" "defg");
   Vb(default_equal "brw" "brw")];;
 

@@ -61,7 +61,7 @@ let rec eval e envi = match e with
   | Bool b -> Vb(b)
   | Or(e1,e2) -> (eval e1 envi) || (eval e2 envi)
   | And(e1,e2) -> (eval e1 envi) && (eval e2 envi)
-  | Not(e1) -> not(eval e1 envi)
+  | Not(e1) -> vnot(eval e1 envi)
   | If_then_else(e1,e2,e3) -> if bool_of_valeur(eval e1 envi) then (eval e2 envi) else (eval e3 envi)
 
   | Id(s) -> snd( List.find (is_id s) envi )

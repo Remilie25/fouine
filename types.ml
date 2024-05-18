@@ -13,17 +13,18 @@ type expr =
   | Or of expr*expr
   | And of expr*expr
   | Not of expr
+  | If_then of expr*expr
   | If_then_else of expr*expr*expr
 
   | Id of string
   | Let_id_in of expr*expr*expr
-  | Fun of expr*expr
+  | Fun of string list*expr
   | App of expr*expr
 
 
 (*Definition du type valeur et de ses operations*)
 
-type valeur = Vc of int | Vb of bool | Vf of expr*expr;;
+type valeur = Vc of int | Vb of bool | Vf of string list*expr | Unit;;
 
 exception NotAllowedOperation
 
@@ -77,9 +78,10 @@ let print_bool b =
   else print_string "false";;
 
 let print_valeur a = match a with
-  |Vc(k) -> print_int(k)
-  |Vb(b) -> print_bool(b)
+  |Vc(k) -> print_int k
+  |Vb(b) -> print_bool b
   |Vf(_,_) -> print_string "fun"
+  |Unit -> print_string "Unit";;
 
 let test =
   [Vc(1) + Vc(2);

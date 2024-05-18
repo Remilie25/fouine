@@ -38,12 +38,26 @@ let rec affiche_expr e =
   | Or(e1,e2) -> aff_aux_2e "Or(" e1 e2
   | And(e1,e2) -> aff_aux_2e "And(" e1 e2
   | Not(e1) -> print_string "Not("; affiche_expr e1; print_string ")"
+  | If_then(e1,e2) -> aff_aux_2e "If_then(" e1 e2
   | If_then_else(e1,e2,e3) -> aff_aux_3e "If_then_else("  e1 e2 e3
 
   | Id(s) -> print_string ( "Id(" ^ s ^ ")" )
   | Let_id_in(e1,e2,e3) -> aff_aux_3e "Let_id_in(" e1 e2 e3
-  | Fun(e1,e2) -> aff_aux_2e "Fun(" e1 e2
+  | Fun(_,_) -> aff_fun e
   | App(e1,e2) -> aff_aux_2e "App(" e1 e2
+
+  and aff_fun f =
+    match f with
+    |Fun([],e) -> print_string ("Fun((),"); affiche_expr e; print_string ")"
+    |Fun(sl,e) -> 
+      begin
+        let rec aux l=match l with
+          |[] -> affiche_expr e
+          |x::r -> ( print_string ("Fun("^x^","); aux r; print_string ")" )
+        in aux sl
+      end
+    |_-> raise NotAFunction
+;;
 
 let is_id v x = match x with
   |s,_ -> default_equal s v;;
@@ -62,6 +76,11 @@ let rec eval e envi = match e with
   | Or(e1,e2) -> (eval e1 envi) || (eval e2 envi)
   | And(e1,e2) -> (eval e1 envi) && (eval e2 envi)
   | Not(e1) -> vnot(eval e1 envi)
+  | If_then(e1,e2) ->begin
+      if bool_of_valeur(eval e1 envi) then raise (ToDo "eval_unit ou unit dans eval");
+      affiche_expr e2; (*pour ne pas avoir le warning tant que c'est WIP*)
+      Unit
+      end
   | If_then_else(e1,e2,e3) -> if bool_of_valeur(eval e1 envi) then (eval e2 envi) else (eval e3 envi)
 
   | Id(s) -> snd( List.find (is_id s) envi )
@@ -73,20 +92,20 @@ let rec eval e envi = match e with
        |_ -> raise (ToDo "functions etc")
      end
     
-  | Fun(e1,e2) -> Vf(e1, e2)
+  | Fun(sl,e) -> Vf(sl, e)
      (*begin
        match e1 with
        |Id(s) -> (Id(s), (eval e2))
      end*)
-  | App(e1,e2) ->
-    begin
+  | App(_,_) ->  raise (ToDo "")
+    (*begin
       match (eval e1 envi) with
-      |Vf(v,f) ->
+      |Vf(sl,f) ->
         begin
-          match v with
+          match sl with
           |Id(s) -> (eval f ( (s, eval e2 envi)::envi ) )
           |_ -> raise (ToDo "plusieurs para ?")
         end
       
       |_ -> raise NotAFunction
-    end
+    end*)

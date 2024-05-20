@@ -23,16 +23,18 @@ open Types   (* rappel: dans expr.ml:
 
 /* les associativités */
 
-%nonassoc (*IF*) THEN (*LET*)
+%nonassoc THEN
+
 %right ELSE IN
-%nonassoc EQUAL GREATER (*FUN  *)
-%left (*APPLY VAPPLY*) MAPSTO
-%nonassoc ID
+
+%nonassoc EQUAL GREATER
+
 %left PLUS MINUS OR AND  /* associativité gauche: a+b+c, c'est (a+b)+c */
    /* associativité gauche ; priorité plus grande de TIMES par rapport à
       PLUS et MINUS, car est sur une ligne située plus bas */
 
 %left TIMES DIV
+
 %nonassoc NOT
 
 %nonassoc UMINUS  /* un "faux token", que l'on utilise pour le MINUS unaire */
@@ -72,14 +74,15 @@ expression:			    /* règles de grammaire pour les expressions */
   | LET e1=expression EQUAL
     e2=expression
     IN e3=expression                      { Let_id_in(e1,e2,e3) }
-  | LET e1=expression EQUAL (*Je pense qu'il y a moyen de factoriser avec le cas precedent.*)
-    a=application
-    IN e2=expression                      { Let_id_in(e1,a,e2) }
-  (*| LET e1=expression e2=expression EQUAL
-                           e3=expression IN e4=expression        { Fun(e1,e2,e3,e4) }*)
+  
+  (*| LET p=parametre EQUAL o=operation
+    IN e=expression                       { Let_fun_in(p,o,e) }*)
             
  
 sexpression:
+  | LPAREN RPAREN                         { Id "Unit" }
+    (*Majuscule pour ne pas confondre avec la variable qui s'appellerait "unit" (identifiant
+      licite en Ocaml). Utilite : pour les fonctions sans parametres.*)
   | i=INT                                 { Const i }
   | b=BOOL                                { Bool b }
   | x=ID                                  { Id x }
@@ -87,17 +90,23 @@ sexpression:
   | LPAREN f=fonction RPAREN              { f }
   | LPAREN a=application RPAREN           { a }
 
+parametre: (*ajouter enchainement de () ou alternance avec ID. Pas difficile mais pas la prio*)
+  | LPAREN RPAREN                         { ["Unit"] }
+  | x=ID                                  { [x] }
+  | x=ID p=parametre                      { x::p }
+
 fonction:
-  | FUN s=ID MAPSTO o=operation           { Fun([s],o) }
+  | FUN p=parametre MAPSTO o=operation    { Fun(p,o) }                        
 
 operation:
-  | e=expression { e }
-  | f=fonction { f }
-  | a=application { a }
+  | e=expression                          { e }
+  | f=fonction                            { f }
+  | a=application                         { a }
 
 application:
-  (*| LPAREN a=application RPAREN           { a }*)
-  | LPAREN f=fonction RPAREN s=sexpression { App(f,s) }
-  | x=ID s=sexpression                     { App(Id x,s) }
-  | a=application s=sexpression            { App(a,s) }
+  (*| LPAREN a=application RPAREN           { a } reduce/recduce conflict; besoin d'une solution
+    pour que une une application parenthesee soit une application.*)
+  | LPAREN f=fonction RPAREN s=sexpression{ App(f,s) }
+  | x=ID s=sexpression                    { App(Id x,s) }
+  | a=application s=sexpression           { App(a,s) }
 

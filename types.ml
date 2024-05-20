@@ -81,7 +81,7 @@ let print_valeur a = match a with
   |Vc(k) -> print_int k
   |Vb(b) -> print_bool b
   |Vf(_,_) -> print_string "fun"
-  |Unit -> print_string "Unit";;
+  |Unit -> print_string "unit";;
 
 let test =
   [Vc(1) + Vc(2);
@@ -105,4 +105,10 @@ let test =
 
 (* Definition du type environemment *)
 
-type env = string*valeur list
+type ele_env = Id_env of string*valeur | Fun_env of string*valeur*(ele_env list);;
+
+(*type env = ele_env list;; 
+ C'est la definition du type environnement. Mais il est commente car sans constructeur, 
+ Ocaml dira que le type est ele_env list au lieu de env. Or je n'ai pas rajouter de
+ constructeur pour ne pas complique pour rien le code.
+ Donc eval : expr -> ele_env list -> valeur mais moralement eval : expr -> env -> valeur*)

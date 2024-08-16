@@ -17,55 +17,53 @@ type expr =
   | If_then_else of expr*expr*expr
 
   | Id of string
-  | Let_id_in of expr*expr*expr
+  | Let_id_in of string list*expr*expr
   | Fun of string list*expr
   | App of expr*expr
 
 
 (*Definition du type valeur et de ses operations*)
 
-type valeur = Vc of int | Vb of bool | Vf of string list*expr | Unit;;
+type valeur = Vc of int | Vb of bool | Vf of string list*expr*((string*valeur) list) | Unit;;
 
 exception NotAllowedOperation
 
 let default_equal s t = s=t;;
         
-let ( + ) a b = match a,b with
+let val_add a b = match a,b with
   |Vc(k),Vc(l) -> Vc(k+l)
-  (*|Vb(k),Vb(l) -> Vb(k||l)*)
   |_,_ -> raise NotAllowedOperation;;
 
-let ( * ) a b = match a,b with
+let val_mul a b = match a,b with
   |Vc(k),Vc(l) -> Vc(k*l)
-  (*|Vb(k),Vb(l) -> Vb(k&&l)*)
   |_,_ -> raise NotAllowedOperation;;
 
-let ( - ) a b = match a,b with
+let val_min a b = match a,b with
   |Vc(k),Vc(l) -> Vc(k-l)
   |_,_ -> raise NotAllowedOperation;;
 
-let ( / ) a b = match a,b with
+let val_div a b = match a,b with
   |Vc(k),Vc(l) -> Vc(k/l)
   |_,_ -> raise NotAllowedOperation;;
 
-let ( = ) a b = match a,b with
+let val_eq a b = match a,b with
   |Vc(k),Vc(l) -> Vb(k=l)
   |Vb(k),Vb(l) -> Vb(k=l)
-  |_,_ -> raise NotAllowedOperation;; (*never used because case before*)
+  |_,_ -> raise NotAllowedOperation;;
 
-let ( > ) a b = match a,b with
+let val_grt a b = match a,b with
   |Vc(k),Vc(l) -> Vb(k>l)
   |_,_ -> raise NotAllowedOperation;;
 
-let ( || ) a b = match a,b with
+let val_or a b = match a,b with
   |Vb(k),Vb(l) -> Vb(k||l)
   |_,_ -> raise NotAllowedOperation;;
 
-let ( && ) a b = match a,b with
+let val_and a b = match a,b with
   |Vb(k),Vb(l) -> Vb(k&&l)
   |_,_ -> raise NotAllowedOperation;;
 
-let vnot a = match a with
+let val_not a = match a with
   |Vb(k) -> Vb(not(k))
   |_ -> raise NotAllowedOperation;;
 
@@ -80,32 +78,39 @@ let print_bool b =
 let print_valeur a = match a with
   |Vc(k) -> print_int k
   |Vb(b) -> print_bool b
-  |Vf(_,_) -> print_string "fun"
+  |Vf(_,_,_) -> print_string "fun"
   |Unit -> print_string "unit";;
 
 let test =
-  [Vc(1) + Vc(2);
-  Vc(2) * Vc(3);
-  Vc(12) - Vc(3);
-  Vc(24) / Vc(2);
-  Vc(1) = Vc(2);
-  Vc(3) = Vc(3);
-  Vb(true) = Vb(false);
-  Vb(true) = Vb(true);
-  Vc(1) > Vc(2);
-  Vc(4) > Vc(2);
-  Vb(false) || Vb(false);
-  Vb(true) || Vb(false);
-  Vb(true) && Vb (false);
-  Vb(true) && Vb(true);
-  vnot(Vb(true));
-  vnot(Vb(false));
-  Vb(default_equal "abc" "defg");
-  Vb(default_equal "brw" "brw")];;
+  [val_add (Vc(1)) (Vc(2));
+  val_mul (Vc(2)) (Vc(3));
+  val_min (Vc(12)) (Vc(3));
+  val_div (Vc(24)) (Vc(2));
+  val_eq (Vc(1)) (Vc(2));
+  val_eq (Vc(3)) (Vc(3));
+  val_eq (Vb(true)) (Vb(false));
+  val_eq (Vb(true)) (Vb(true));
+  val_grt (Vc(1)) (Vc(2));
+  val_grt (Vc(4)) (Vc(2));
+  val_or (Vb(false)) (Vb(false));
+  val_or (Vb(true)) (Vb(false));
+  val_and (Vb(true)) (Vb (false));
+  val_and (Vb(true)) (Vb(true));
+  val_not(Vb(true));
+  val_not(Vb(false));];;
 
 (* Definition du type environemment *)
+(*type env = (string*valeur) list
+  Les envi_local sont directement stockes dans la val de fonction.*)
 
+
+
+
+(*Ce n'est plus le cas car complique pour rien. *)
+
+(*
 type ele_env = Id_env of string*valeur | Fun_env of string*valeur*(ele_env list);;
+ *)
 
 (*type env = ele_env list;; 
  C'est la definition du type environnement. Mais il est commente car sans constructeur, 

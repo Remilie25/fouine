@@ -17,18 +17,19 @@ type expr =
   | If_then_else of expr*expr*expr
 
   | Id of string
-  | Let_id_in of string list*expr*expr
-  | Fun of string list*expr
+  | Let_id_in of expr list*expr*expr
+  | Fun of expr list*expr
   | App of expr*expr
+  | Expr_unit
 
 
 (*Definition du type valeur et de ses operations*)
 
-type valeur = Vc of int | Vb of bool | Vf of string list*expr*((string*valeur) list) | Unit;;
+type valeur = Vc of int | Vb of bool | Vf of expr*expr*((string*valeur) list) | Val_unit;;
 
 exception NotAllowedOperation
+exception ToDo of string
 
-let default_equal s t = s=t;;
         
 let val_add a b = match a,b with
   |Vc(k),Vc(l) -> Vc(k+l)
@@ -71,6 +72,11 @@ let bool_of_valeur a = match a with
   |Vb(b) -> b
   |_ -> raise NotAllowedOperation;;
 
+let string_of_id x = match x with
+  | Id s -> s
+  | Expr_unit -> "Unit" (*Solution temporaire. Pas d'id de ce nom car commence par une majuscule.*)
+  | _ -> raise (ToDo "msg err from types")
+
 let print_bool b =
   if b then print_string "true"
   else print_string "false";;
@@ -79,7 +85,7 @@ let print_valeur a = match a with
   |Vc(k) -> print_int k
   |Vb(b) -> print_bool b
   |Vf(_,_,_) -> print_string "fun"
-  |Unit -> print_string "unit";;
+  |Val_unit -> print_string "unit";;
 
 let test =
   [val_add (Vc(1)) (Vc(2));

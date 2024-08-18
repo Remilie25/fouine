@@ -30,25 +30,30 @@ let rec affiche_expr e =
   | Let_id_in(p,e1,e2) ->
      begin
        match p with
-       | [s] -> aff_aux "Let_id_in(" [Id s;e1;e2]
-       | fun_id::para -> (print_string "Let_id_in("; affiche_expr (Id fun_id); print_string ", ";
+       | [s] -> aff_aux "Let_id_in(" [s;e1;e2]
+       | fun_id::para -> (print_string "Let_id_in("; affiche_expr (fun_id); print_string ", ";
                           aff_fun (Fun(para, e1));
                           aff_aux ", " [e2])
-       | _ -> raise (ToDo "msg err")
+       | _ -> raise (ToDo "msg err 0")
      end
     
   | Fun(_,_) -> aff_fun e
   | App(e1,e2) -> aff_aux "App(" [e1;e2]
+  | Expr_unit -> print_string "Unit"
 
   and aff_fun f =
     match f with
     (*|Fun([],e) -> print_string ("Fun((),"); affiche_expr e; print_string ")" Cas inutile*)
-    | Fun(sl,e) -> 
+    | Fun(para,e) -> 
       begin
         let rec aux l=match l with
-          |[] -> affiche_expr e
-          |x::r -> ( print_string ("Fun("^x^", "); aux r; print_string ")" )
-        in aux sl
+          | [] -> affiche_expr e
+          | x::r ->
+             match x with
+             | Id s -> ( print_string ("Fun("^s^", "); aux r; print_string ")" )
+             | Expr_unit -> ( print_string ("Fun(Unit, "); aux r; print_string ")" )
+             | _ -> raise (ToDo "msg err 1")    
+        in aux para
       end
 
     | Id(_) | App(_,_) -> affiche_expr f
@@ -70,22 +75,28 @@ let aff_vf_type f=
 ;;*)
 
 let is_id v x = match x with
-  |(s,_) -> default_equal s v;;
+  |(s,_) -> s = v;;
 
-let rec env_cat env_list =
+let rec cat_sans_doublons is_member list=
+  let rec aux l1 l2 = match l2 with
+    (*Parcourt l'env2 en ajoutant les id dans env1 sans doublons.*)
+    | [] -> l1
+    | ele::r when List.exists (is_member ele) l1 -> aux l1 r
+    | ele::r -> ele :: (aux l1 r)
+  in
+  match list with
+  | [l] -> l
+  | [] -> []
+  | l::_::_ -> aux (cat_sans_doublons is_member (List.tl list)) l;; 
+
+let env_cat env_list =
   (*Cette fonciton concatene tous les environnements sans doublons.
     Les env sont supposes sans doublons*)
+  cat_sans_doublons (fun ele couple -> (fst ele) = (fst couple)) env_list
   
-  let rec aux env1 env2 = match env2 with
-    (*Parcourt l'env2 en ajoutant les id dans env1 sans doublons.*)
-    | [] -> env1
-    | (s, _)::r when List.exists (fun couple -> s = (fst couple)) env1 -> aux env1 r
-    | (s, v)::r -> (s, v) :: (aux env1 r)
-  in
-  match env_list with
-  | [env] -> env
-  | [] -> []
-  | env::_::_ -> aux (env_cat (List.tl env_list)) env;; 
+and id_cat string_list =
+  (*Cette fonction concatene des listes de string sans doublons.*)
+  cat_sans_doublons (fun ele couple -> ele = couple) string_list;;
 
 
                       
@@ -106,24 +117,20 @@ let rec eval e envi = match e with
   | If_then(e1,e2) ->begin
       if bool_of_valeur(eval e1 envi) then raise (ToDo "eval_unit ou unit dans eval");
       affiche_expr e2; (*pour ne pas avoir le warning tant que c'est WIP*)
-      Unit
+      Val_unit
       end
   | If_then_else(e1,e2,e3) -> if bool_of_valeur(eval e1 envi) then (eval e2 envi) else (eval e3 envi)
 
-  | Id(s) -> if s = "Unit" then Unit
-             else snd( List.find (is_id s) envi )
-               (* pas de distinction selon le type ? WIP
-     match snd( List.find (is_id s) envi ) with
-             |Vc(k) -> Vc(k)
-             |Vb(b) -> Vb(b)
-             |Vf(para, op, arg) -> Vf(para, op, arg)*)
+  | Id(s) -> snd( List.find (is_id s) envi )
+
+  | Expr_unit -> Val_unit
            
   |Let_id_in(p, e1, e2) ->
     begin
       match p with
-      | [s] -> eval e2 ((s, eval e1 envi)::envi)
-      | fun_id::para -> eval e2 (( fun_id, eval (Fun(para, e1)) envi )::envi)
-      | _ -> raise (ToDo "msg err")
+      | [x] -> eval e2 ((string_of_id x, eval e1 envi)::envi)
+      | fun_id::para -> eval e2 (( string_of_id fun_id, eval (Fun(para, e1)) envi )::envi)
+      | _ -> raise (ToDo "msg err 2")
     end
     
   | Fun(para, op) ->
@@ -136,15 +143,15 @@ let rec eval e envi = match e with
        
        match op with
        (*Cas ou il faut faire grandir notre envi_local*)
-       | Id(s) when (List.mem s para || s = "Unit") -> envi_local
+       | Id(s) when List.mem s para -> envi_local
 
-       | Id(s) -> ( s, eval (Id(s)) envi )::envi_local
+       | Id(s) -> ( s, eval op envi )::envi_local
 
                 
        (*Pour garder les bonnes valuers. Ex ou il pourraient y avoir des pb sans :
          let k = 1 in let fun_test x= let aux l= k+l in aux x in let k = 2 in fun_test k
          A mettre dans les tests par la suite.*)
-       | Fun(para2, op2) -> init_envi_local (para @ para2) op2 []
+       | Fun(para2, op2) -> init_envi_local (id_cat [para;List.map string_of_id para2]) op2 []
        
        | Let_id_in(x,e1,e2) ->
           begin
@@ -152,21 +159,23 @@ let rec eval e envi = match e with
             (*Ici on definit une nouvelle valeur a un id donc pas besoin de stocker son eventuelle 
               valeur anterieure si l'on tombe sur id apres le "in". En revanche dans la def de sa
               nouvelle valeur, nous en avons besoin.*)
-            | [s] -> env_cat [init_envi_local para e1 envi_local; init_envi_local (s::para) e2 envi_local]
+            | [x] -> env_cat [init_envi_local para e1 envi_local;
+                              init_envi_local ((string_of_id x)::para) e2 envi_local]
 
             (*Ici on definit une nouvelle fonction donc pas besoin de stocker l'eventuelle valeur
-              anterieure si l'on tombe sur id apres le "in". Les parametres oui car se ne sont plus des
-              parametres apres la definition. En revanche dans la def de la fonction, nous en avons
-              besoin mais pas les valeurs des parametres.*)
-            | fun_id::para ->
-               env_cat [init_envi_local para e1 envi_local; init_envi_local [fun_id] e2 envi_local]
+              anterieure si l'on tombe sur id apres le "in". Les parametres oui car se ne sont plus
+              des parametres apres la definition. En revanche dans la def de la fonction, nous en 
+              avons besoin mais pas les valeurs des parametres.*)
+            | fun_id::para2 ->
+               env_cat [init_envi_local (id_cat [para;List.map string_of_id para2]) e1 envi_local;
+                        init_envi_local [string_of_id fun_id] e2 envi_local]
                                 
-            | _ -> raise (ToDo "msg err")
+            | _ -> raise (ToDo "msg err 3")
           end
          
             
        (*Le reste : appel rec ou cas de base sans faire grandir l'envi_local*)
-       | Const _ | Bool _ -> envi_local
+       | Const _ | Bool _ | Expr_unit-> envi_local
 
        | Not(e1) -> init_envi_local para e1 envi_local
                            
@@ -177,97 +186,26 @@ let rec eval e envi = match e with
        | If_then_else(e1,e2,e3) -> env_cat [init_envi_local para e1 envi_local;
          init_envi_local para e2 envi_local; init_envi_local para e3 envi_local]
      in
-
-     Vf(para, op, init_envi_local para op []) (*Il faudrait evaluer un envi_local ici avec var libre*)
+     begin
+     match para with
+     | [p0] -> Vf(p0, op, init_envi_local (List.map string_of_id para) op [])
+     | p0::_::_ -> Vf(p0, Fun(List.tl para, op), init_envi_local (List.map string_of_id para) op [])
+     | [] -> raise (NotAFunction 2)
+     end
 
   | App(f, arg) ->
-     let rec eval_envi f envi=
-       (* Entree : f de type expr, c'est soit une Fun soit une App.
-          Sortie : (g, envi_local) de type expr*env. g est l'evaluation de la fonction f aux 
-          premiers parametres qui sont ajoutes a l'environement envi_local. g est donc une Fun.
-          envi_local est envi ou on a ajoute les parametres de f dont les valeurs sont connues.
-          Parcours f, afin de construire la fonction et son environement pour eval App(f,s)
-          ToDo : ameliorer la construction de l'envi (car on met tt alors que pas tt ne sert).*)
 
-       match f with
-       (*Cas de base. La fonciton ne recoit qu'un para.*)
-       | Fun(_,_) -> f, envi
+     match eval f envi with
+       
+     | Vf(para, op, envi_local) ->
+        begin
+          match para with
+          | Expr_unit -> if (eval arg envi) = Val_unit then eval op envi_local
+                         else raise NotExpectedType
+                       
+          | Id s -> eval op ((s, eval arg envi)::envi_local)
 
-       (*Cas de base ou la fonciton est stockee dans un id.*)
-       | Id(s) ->
-          begin
-              match snd( List.find (is_id s) envi ) with
-              | Vf(para,op,envi_local) -> (Fun(para,op)), envi_local
-                                        
-              | _ -> raise (NotAFunction 2)
-         end
-
-         
-              
-       | App(g,arg) -> (*Cas des fonctions qui recoit deux ou plus parametres. On s'appelle rec.*)
-          begin
-            match eval_envi g envi with
-
-            (*On enleve le premier parametre de la fonction et on le place dans l'environnement 
-              local avec sa valeur.*)
-            | Fun(para,op),envi_local ->
-               begin
-                 match para with (*Structure similaire #1*)
-                 | p0::_::_ when p0 = "Unit" ->
-                    if eval arg envi = Unit then Fun(List.tl para, op), envi_local
-                    else raise NotExpectedType
-                   
-                 | p0::_::_ -> Fun(List.tl para, op), (p0, eval arg envi)::envi_local
-                            
-                 |_ -> raise (ToDo "Pb pas assez d'argument")
-               end
-
-           
-            (*L'eval_envi renvoie une App => le seul cas possible est de venir d'une id. Rien a faire.*)
-            (*| App(h,v),e -> App(h,v),e*)
-              
-            | h,_ -> raise (affiche_expr h ;(ToDo "Pb cas impossible 2"))
-          end
-         
-       | _-> raise (ToDo "Pb cas impossible 1")
-
-     in
-     begin
-       match f with
-         
-       | Fun(para,op) -> (*Cas de base des applications ou le membre de gauche est directement une
-                      fonction.*)
-
-          begin
-            match para with (*Structure similaire #1*)
-            (*Si la fonction a un seul parametre, on l'evalue. Sinon ToDo*)
-              
-            | [p0] when p0 = "Unit" -> if eval arg envi = Unit then (eval op envi)
-                                       else raise NotExpectedType
-            | [p0] -> ( eval op ( (p0, eval arg envi)::envi ) )
-                    
-            | p0::_::_ when p0 = "Unit" -> if eval arg envi = Unit then (eval (Fun(List.tl para, op)) envi)
-                                           else raise NotExpectedType
-            | p0::_::_ -> (eval (Fun(List.tl para, op)) ( (p0, eval arg envi)::envi ) )
-            (*Non ca ne marche pas d'ajouter ainsi le parametre. Il peut etre utilise en dehors
-              et ca valeur exterieur est perdue...*)
-             
-            |_ -> raise (ToDo "Pb ?")
-          end
-         
-       | App(_,_) ->
-          begin
-            match eval_envi f envi with
-            | g,e -> (*(* Debug:*) print_string "g = " ; aff_fun g; print_newline(); let _ =List.map (fun (x,y)-> print_string (x^" = "); print_valeur y; print_newline()) e in*) eval (App(g,arg)) e
-          end
-
-       | Id(s) ->
-          begin
-            match snd( List.find (is_id s) envi ) with
-            | Vf(para,op,envi_local) -> eval (App(Fun(para,op), arg)) envi_local
-                                      
-            | _ -> raise (NotAFunction 2)
-          end
-       |_ -> raise (NotAFunction 1)
-     end
-  
+          | _ -> raise (NotAFunction 2)
+        end
+       
+     | _ -> raise (NotAFunction 1)

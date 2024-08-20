@@ -1,4 +1,7 @@
-(* un type pour des expressions *)
+(* Definition du type rec_state. Indique si une fonction est rec ou non et stocke son id si elle l'est.*)
+type rec_state = Non_rec | Rec of string;;
+
+(* un type pour des expressions *)  
 type expr =
     Const of int 
   | Add of expr*expr
@@ -17,15 +20,16 @@ type expr =
   | If_then_else of expr*expr*expr
 
   | Id of string
-  | Let_id_in of expr list*expr*expr
-  | Fun of expr list*expr
+  | Let_id_in of rec_state*expr list*expr*expr
+  | Fun of rec_state*expr list*expr
   | App of expr*expr
   | Expr_unit
+;;
 
 
 (*Definition du type valeur et de ses operations*)
 
-type valeur = Vc of int | Vb of bool | Vf of expr*expr*((string*valeur) list) | Val_unit;;
+type valeur = Vc of int | Vb of bool | Vf of rec_state*expr*expr*((string*valeur) list) | Val_unit;;
 
 exception NotAllowedOperation
 exception ToDo of string
@@ -84,7 +88,7 @@ let print_bool b =
 let print_valeur a = match a with
   |Vc(k) -> print_int k
   |Vb(b) -> print_bool b
-  |Vf(_,_,_) -> print_string "fun"
+  |Vf(_,_,_,_) -> print_string "fun"
   |Val_unit -> print_string "unit";;
 
 let test =

@@ -14,36 +14,37 @@ let lettre_majuscule = ['A'-'Z']
 let lettre = lettre_minuscule | lettre_majuscule
                          
 rule token = parse    (* la "fonction" aussi s'appelle token .. *)
-  | [' ' '\t']     { token lexbuf }    (* on saute les blancs et les tabulations *)
- 	     	   	           (* en faisant cet appel récursif à "token" *)
-  | '\n'            { EOL }   (*EndOfLine*)
-  | '+'             { PLUS }
-  | '*'             { TIMES }
-  | '-'             { MINUS }
-  | '/'             { DIV }
-  | '='             { EQUAL }
-  | '>'             { GREATER }
-  | nombre as s { INT (int_of_string s) }
+  | [' ' '\t']             { token lexbuf }
+    (* on saute les blancs et les tabulations en faisant cet appel récursif à "token" *)
+  | '\n'                   { EOL }   (*EndOfLine*)
+  | '+'                    { PLUS }
+  | '*'                    { TIMES }
+  | '-'                    { MINUS }
+  | '/'                    { DIV }
+  | '='                    { EQUAL }
+  | '>'                    { GREATER }
+  | nombre as s            { INT (int_of_string s) }
   
-  | '(' | "begin"     { LPAREN }
-  | ')' | "end"       { RPAREN }
+  | '(' | "begin"          { LPAREN }
+  | ')' | "end"            { RPAREN }
+                           
+  | "&&"                   { AND }
+  | "||"                   { OR }
+  | "not"                  { NOT }
+  | "if"                   { IF }
+  | "then"                 { THEN }
+  | "else"                 { ELSE }
+  | booleen as b           { BOOL(bool_of_string (b)) }
+                           
+  | "let"                  { LET }
+  | "in"                   { IN }
+                           
+  | "fun"                  { FUN }
+  | "->"                   { MAPSTO }
+  | "rec"                  { REC }
   
-  | "&&"            { AND }
-  | "||"            { OR }
-  | "not"           { NOT }
-  | "if"            { IF }
-  | "then"          { THEN }
-  | "else"          { ELSE }
-  | booleen as b    { BOOL(bool_of_string (b)) }
+  | (lettre_minuscule | '_')+ (lettre | chiffre | '_' | '\'')* as s  { ID(s) }
 
-  | "let"           { LET }
-  | "in"            { IN }
-  
-  | "fun"           { FUN }
-  | "->"            { MAPSTO }
-  
-  | lettre_minuscule+ (lettre | chiffre)* as s  { ID(s) }
-
-  | eof             { raise Eof } (* EndOfFile : ici on fait un "raise", 
-                                plus tard votre fouine ne paniquera
-                                pas en tombant sur eof *)
+  | eof                    { raise Eof }
+    (* EndOfFile : ici on fait un "raise", plus tard votre fouine ne paniquera
+       pas en tombant sur eof *)

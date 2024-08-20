@@ -1,0 +1,22 @@
+Add_mul_prec;3+2*4;Add(3, Mul(2, 4));11
+Var_simple;let k = 1 in 1+k;Let_id_in(Id(k), 1, Add(1, Id(k)));2
+If_simple;if 2>1 then (if 1>2 then 0 else 1) else 2;If_then_else(Grt(2, 1), If_then_else(Grt(1, 2), 0, 1), 2);1
+Var_if;let x=5 in if x = 2 then x+1 else 10*x+2;Let_id_in(Id(x), 5, If_then_else(Eq(Id(x), 2), Add(Id(x), 1), Add(Mul(10, Id(x)), 2)));52
+Simple_fun;fun x-> x+1;Fun(x, Add(Id(x), 1));fun
+Curry_fun;fun x y -> x+y;Fun(x, Fun(y, Add(Id(x), Id(y))));fun
+Apply_simple_fun;(fun x-> x+1) 1;App(Fun(x, Add(Id(x), 1)), 1);2
+Apply_fun_to_app;(fun x-> x*10) ((fun x-> x+2) 0);App(Fun(x, Mul(Id(x), 10)), App(Fun(x, Add(Id(x), 2)), 0));20
+Apply_fun_to_fun;(fun f-> f 0) (fun x->x+1);App(Fun(f, App(Id(f), 0)), Fun(x, Add(Id(x), 1)));1
+Fun_returning_fun;fun x-> (((fun y-> y+x)));Fun(x, Fun(y, Add(Id(y), Id(x))));fun
+Fun_unit;(fun ()->1) ();App(Fun(Unit, 1), Unit);1
+Fun_para_unit_0;(fun () x->()) () 1;App(App(Fun(Unit, Fun(x, Unit)), Unit), 1);unit
+Fun_para_unit_1;(fun x ()->5) 1 ();App(App(Fun(x, Fun(Unit, 5)), 1), Unit);5
+Let_fun_0;let f x y = x + y in f 1 2;Let_id_in(Id(f), Fun(x, Fun(y, Add(Id(x), Id(y)))), App(App(Id(f), 1), 2));3
+Let_fun_1;let f = fun x y -> x * y in f 7 2;Let_id_in(Id(f), Fun(x, Fun(y, Mul(Id(x), Id(y)))), App(App(Id(f), 7), 2));14
+Let_fun_2;let f x = fun y -> x / y in f 9 3;Let_id_in(Id(f), Fun(x, Fun(y, Div(Id(x), Id(y)))), App(App(Id(f), 9), 3));3
+Let_fun_var_libre;let k = 2 in let c = 5 in let f x y = k*(x+y)+c in let k = 1 in f k 2;Let_id_in(Id(k), 2, Let_id_in(Id(c), 5, Let_id_in(Id(f), Fun(x, Fun(y, Add(Mul(Id(k), Add(Id(x), Id(y))), Id(c)))), Let_id_in(Id(k), 1, App(App(Id(f), Id(k)), 2)))));11
+Let_operand_0;1 + let f=(fun x-> x+1) in f 0;Add(1, Let_id_in(Id(f), Fun(x, Add(Id(x), 1)), App(Id(f), 0)));2
+Let_operand_1;(let f=(fun x-> x+1) in f 0) + 1;Add(Let_id_in(Id(f), Fun(x, Add(Id(x), 1)), App(Id(f), 0)), 1);2
+Apply_operand;let f=(fun x-> x+1) in f 1 * 2;Let_id_in(Id(f), Fun(x, Add(Id(x), 1)), Mul(App(Id(f), 1), 2));4
+Fun_same_parameters;let f x y = 1 + ((fun x y -> x + y) (x*y) 1) in f 2 3;Let_id_in(Id(f), Fun(x, Fun(y, Add(1, App(App(Fun(x, Fun(y, Add(Id(x), Id(y)))), Mul(Id(x), Id(y))), 1)))), App(App(Id(f), 2), 3));8
+Factorielle;let rec facto k = if (k = 0) then 1 else k * (facto (k-1)) in facto 5;Let_id_in(Id(facto), Fun(k, If_then_else(Eq(Id(k), 0), 1, Mul(Id(k), App(Id(facto), Min(Id(k), 1))))), App(Id(facto), 5));120

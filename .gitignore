@@ -2,8 +2,6 @@
 
 _*
 
-test*
-
 arret.txt
 
 dune*
@@ -12,4 +10,4 @@ valeur_no_overload.ml
 
 README.md
 
-tmp_*
+tmp*

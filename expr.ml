@@ -27,24 +27,23 @@ let rec affiche_expr e =
   | If_then_else(e1,e2,e3) -> aff_aux "If_then_else("  [e1;e2;e3]
 
   | Id(s) -> print_string ( "Id(" ^ s ^ ")" )
-  | Let_id_in(p,e1,e2) ->
+  | Let_id_in(recu,p,e1,e2) ->
      begin
        match p with
        | [s] -> aff_aux "Let_id_in(" [s;e1;e2]
        | fun_id::para -> (print_string "Let_id_in("; affiche_expr (fun_id); print_string ", ";
-                          aff_fun (Fun(para, e1));
+                          aff_fun (Fun(recu,para, e1));
                           aff_aux ", " [e2])
        | _ -> raise (ToDo "msg err 0")
      end
     
-  | Fun(_,_) -> aff_fun e
+  | Fun(_,_,_) -> aff_fun e
   | App(e1,e2) -> aff_aux "App(" [e1;e2]
   | Expr_unit -> print_string "Unit"
 
   and aff_fun f =
     match f with
-    (*|Fun([],e) -> print_string ("Fun((),"); affiche_expr e; print_string ")" Cas inutile*)
-    | Fun(para,e) -> 
+    | Fun(_, para, e) -> 
       begin
         let rec aux l=match l with
           | [] -> affiche_expr e
@@ -74,9 +73,6 @@ let aff_vf_type f=
   | _ -> raise (NotAFunction 0)
 ;;*)
 
-let is_id v x = match x with
-  |(s,_) -> s = v;;
-
 let rec cat_sans_doublons is_member list=
   let rec aux l1 l2 = match l2 with
     (*Parcourt l'env2 en ajoutant les id dans env1 sans doublons.*)
@@ -97,6 +93,27 @@ let env_cat env_list =
 and id_cat string_list =
   (*Cette fonction concatene des listes de string sans doublons.*)
   cat_sans_doublons (fun ele couple -> ele = couple) string_list;;
+
+let build_fun_value fun_other_val_case value =
+  (*Cette fonction sert a construire les fonctions du type valeur qui peuvent etre recursives.
+    L'idee est qu'a chaque fois qu'on evalue une fonction rec, on la met dans son envi_local avant
+    toute autre operation. Cela afin de conserver l'envi_local dans l'etat qu'il etait lors de la
+    definition.*)
+
+  match value with
+  | Val_unit | Vc _ | Vb _ -> fun_other_val_case value
+
+  (*Si la fun est rec => on ajoute l'ajoute dans son envi_local. Sinon rien de special*)
+  | Vf(recu, para, op, envi_local) ->
+     begin
+       match recu with
+       | Non_rec -> value
+       | Rec s -> Vf(recu, para, op, (s,value)::envi_local)
+     end;;
+
+let fun_id_if_rec recu = match recu with
+  | Non_rec -> []
+  | Rec s -> [s];;
 
 
                       
@@ -121,26 +138,36 @@ let rec eval e envi = match e with
       end
   | If_then_else(e1,e2,e3) -> if bool_of_valeur(eval e1 envi) then (eval e2 envi) else (eval e3 envi)
 
-  | Id(s) -> snd( List.find (is_id s) envi )
+  | Id(s) -> build_fun_value (fun x->x) (List.assoc s envi)
 
   | Expr_unit -> Val_unit
            
-  |Let_id_in(p, e1, e2) ->
+  |Let_id_in(recu, p, e1, e2) ->
+    (* recu : rec_state -> indique si c'est la fonction est rec et stocke son id.
+       Marche que pour les fonctions !
+       p : expr list ((Id _ | Expr_unit) list pour etre plus precis)
+       e1, e2 : expr -> ce sont resp. la def de l'id et le bloc dans lequel l'id existe.*)
     begin
       match p with
       | [x] -> eval e2 ((string_of_id x, eval e1 envi)::envi)
-      | fun_id::para -> eval e2 (( string_of_id fun_id, eval (Fun(para, e1)) envi )::envi)
+             
+      | fun_id::para ->
+         let envi = (( string_of_id fun_id, build_fun_value (fun _ ->raise (NotAFunction 3)) (eval (Fun(recu, para, e1)) envi) )::envi)
+                  (*   ^-----------------^  ^--------------------------------------------------------------------------------^
+                       L=> id de la fonciton       L=> construction de sa valeur *)
+         in eval e2 envi
+        
       | _ -> raise (ToDo "msg err 2")
     end
     
-  | Fun(para, op) ->
+  | Fun(recu, para, op) ->
      let rec init_envi_local para op envi_local=
        (*Cette fonction construit la cloture de la fonction.
          para : liste des id a ne pas stocker. Cas ou c'est un parametre de la fonciton
                 mais aussi apres la declaration d'un nouveau id.
          op : expression a parcourir pour trouver des id.
          envi_local : c'est la cloture.*)
-       
+
        match op with
        (*Cas ou il faut faire grandir notre envi_local*)
        | Id(s) when List.mem s para -> envi_local
@@ -150,16 +177,17 @@ let rec eval e envi = match e with
                 
        (*Pour garder les bonnes valuers. Ex ou il pourraient y avoir des pb sans :
          let k = 1 in let fun_test x= let aux l= k+l in aux x in let k = 2 in fun_test k
-         A mettre dans les tests par la suite.*)
-       | Fun(para2, op2) -> init_envi_local (id_cat [para;List.map string_of_id para2]) op2 []
+         A mettre dans les tests par la suite.
+         Impossible que la fonction soit rec car c'est un lambda.*)
+       | Fun(_, para2, op2) -> init_envi_local (id_cat [para; List.map string_of_id para2]) op2 []
        
-       | Let_id_in(x,e1,e2) ->
+       | Let_id_in(recu2, x, e1, e2) ->
           begin
             match x with
             (*Ici on definit une nouvelle valeur a un id donc pas besoin de stocker son eventuelle 
               valeur anterieure si l'on tombe sur id apres le "in". En revanche dans la def de sa
               nouvelle valeur, nous en avons besoin.*)
-            | [x] -> env_cat [init_envi_local para e1 envi_local;
+            | [x] -> env_cat [init_envi_local (id_cat [para; fun_id_if_rec recu2]) e1 envi_local;
                               init_envi_local ((string_of_id x)::para) e2 envi_local]
 
             (*Ici on definit une nouvelle fonction donc pas besoin de stocker l'eventuelle valeur
@@ -167,15 +195,16 @@ let rec eval e envi = match e with
               des parametres apres la definition. En revanche dans la def de la fonction, nous en 
               avons besoin mais pas les valeurs des parametres.*)
             | fun_id::para2 ->
-               env_cat [init_envi_local (id_cat [para;List.map string_of_id para2]) e1 envi_local;
-                        init_envi_local [string_of_id fun_id] e2 envi_local]
+               env_cat [init_envi_local ( id_cat [para; List.map string_of_id para2;
+                                                  fun_id_if_rec recu2] ) e1 envi_local;
+                        init_envi_local (id_cat [para; [string_of_id fun_id]]) e2 envi_local]
                                 
             | _ -> raise (ToDo "msg err 3")
           end
          
             
        (*Le reste : appel rec ou cas de base sans faire grandir l'envi_local*)
-       | Const _ | Bool _ | Expr_unit-> envi_local
+       | Const _ | Bool _ | Expr_unit -> envi_local
 
        | Not(e1) -> init_envi_local para e1 envi_local
                            
@@ -187,17 +216,18 @@ let rec eval e envi = match e with
          init_envi_local para e2 envi_local; init_envi_local para e3 envi_local]
      in
      begin
-     match para with
-     | [p0] -> Vf(p0, op, init_envi_local (List.map string_of_id para) op [])
-     | p0::_::_ -> Vf(p0, Fun(List.tl para, op), init_envi_local (List.map string_of_id para) op [])
-     | [] -> raise (NotAFunction 2)
+       let envi_local = init_envi_local (id_cat [List.map string_of_id para; fun_id_if_rec recu ]) op [] in
+       match para with
+       | [p0] -> Vf(recu, p0, op, envi_local)
+       | p0::_::_ -> Vf(recu, p0, Fun(Non_rec, List.tl para, op), envi_local)
+       | [] -> raise (NotAFunction 2)
      end
 
   | App(f, arg) ->
 
      match eval f envi with
        
-     | Vf(para, op, envi_local) ->
+     | Vf(_, para, op, envi_local) ->
         begin
           match para with
           | Expr_unit -> if (eval arg envi) = Val_unit then eval op envi_local

@@ -3,9 +3,9 @@ open Expr
 
 let interpret e =
   begin
-    affiche_expr e;
+    affiche_expr_list e;
     print_newline();
-    Types.print_valeur (eval e []);
+    let _= List.map Types.print_result (List.rev (seq_eval e [])) in
     print_newline()
   end
 

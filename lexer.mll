@@ -14,9 +14,8 @@ let lettre_majuscule = ['A'-'Z']
 let lettre = lettre_minuscule | lettre_majuscule
                          
 rule token = parse    (* la "fonction" aussi s'appelle token .. *)
-  | [' ' '\t']             { token lexbuf }
+  | [' ' '\t' '\n']        { token lexbuf }
     (* on saute les blancs et les tabulations en faisant cet appel récursif à "token" *)
-  | '\n'                   { EOL }   (*EndOfLine*)
   | '+'                    { PLUS }
   | '*'                    { TIMES }
   | '-'                    { MINUS }
@@ -38,13 +37,13 @@ rule token = parse    (* la "fonction" aussi s'appelle token .. *)
                            
   | "let"                  { LET }
   | "in"                   { IN }
-                           
+  | ";;"                   { DBL_SCOLON }
   | "fun"                  { FUN }
   | "->"                   { MAPSTO }
   | "rec"                  { REC }
   
   | (lettre_minuscule | '_')+ (lettre | chiffre | '_' | '\'')* as s  { ID(s) }
 
-  | eof                    { raise Eof }
+  | eof                    { EOF }
     (* EndOfFile : ici on fait un "raise", plus tard votre fouine ne paniquera
        pas en tombant sur eof *)

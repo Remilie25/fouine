@@ -54,6 +54,8 @@ results_matched = []
 #Store only results that did not matched (() for the others).
 results_given = []
 
+is_perfect = True
+
 #Checks the results            (expected_results.append(name, code, tree, result[:-1]))
 for i in range(len(expected_results)):
     results = open("tests/tmp/r_" + expected_results[i][0], 'r')
@@ -69,70 +71,77 @@ for i in range(len(expected_results)):
     else:
         results_given.append((tree, result))
 
-    print(expected_results[i][0], end=' : ')
-
+    printing_scheme = "%s : \033[31m%s mismatched !\033[0m \n      Had : %s Expected : %s\n"
+    name = expected_results[i][0]
+    
     result = result.replace(" EOL ","\n")
+    exp_result = expected_results[i][3].replace(" EOL ","\n")
+    exp_tree = expected_results[i][2]
     
     if t_bool:
-        if r_bool:
-            print("OK")
-        else:
-            print("\033[31mResults mismatched !\033[0m \n     Had :", result, "Expected :", expected_results[i][3].replace(" EOL ","\n"))
+        if not r_bool:
+            is_perfect = False
+            print(printing_scheme%(name, "Results", result, exp_result))
     else:
+        is_perfect = False
         if r_bool:
-            print("\033[31mTrees mismatched !\033[0m \n     Had :", tree, "\nExpected :", expected_results[i][2], end = "\n\n")
+            print(printing_scheme%(name, "Trees", tree + '\n', exp_tree))
         else:
-            print("\033[31mTrees and results mismatched !\033[0m \n     Had :", tree, "\nExpected :", expected_results[i][2],
-                   "\n     Had :", result, "Expected :", expected_results[i][3].replace(" EOL ","\n"))
+            print(printing_scheme%(name, "Trees and results", tree + '\n', exp_tree),
+                  "     Had :", result, "Expected :", exp_result, end="\n\n")
 
-#asks : rewrite the correct result ?
-question = "Voulez-vous redefinir le resultat attendu pour %s? (type '?' for help) : "
-answer = ''
-replace_line = [False for _ in range(len(expected_results))]
-
-for i in range(len(expected_results)):
-    if not(results_matched[i]):
-        if not(answer in ['!', 'q']):
-
-            answer = ''
-            while not(answer in ['y', 'n', '!', 'q']):
-                answer = input(question%(expected_results[i][0]))
-                if answer == '?':
-                    print("Type :\n'y' to replace the expected result.\n'n' to skip this result.\n'!' to replace all mismatches.\n'q' to quit.\n'?' to display this help.")
+if is_perfect:
+    print("Tests : OK")
+else:
             
-            if answer in ['y', '!']:
+    #asks : rewrite the correct result ?
+    question = "Voulez-vous redefinir le resultat attendu pour %s? (type '?' for help) : "
+    answer = ''
+    replace_line = [False for _ in range(len(expected_results))]
+
+    for i in range(len(expected_results)):
+        if not(results_matched[i]):
+            if not(answer in ['!', 'q']):
+
+                answer = ''
+                while not(answer in ['y', 'n', '!', 'q']):
+                    answer = input(question%(expected_results[i][0]))
+                    if answer == '?':
+                        print("Type :\n'y' to replace the expected result.\n'n' to skip this result.\n'!' to replace all mismatches.\n'q' to quit.\n'?' to display this help.")
+            
+                if answer in ['y', '!']:
+                    replace_line[i] = True
+               
+            elif answer == '!':
                 replace_line[i] = True
-               
-        elif answer == '!':
-            replace_line[i] = True
-        else:
-            break
+            else:
+                break
 
-#Replaces if needed
-if True in replace_line:
-    test_file = open("tests/basic.txt", 'r')
-    new_tf = open("tests/new_basic.txt", 'w')
-    i = 0
-    c = 0
+    #Replaces if needed
+    if True in replace_line:
+        test_file = open("tests/basic.txt", 'r')
+        new_tf = open("tests/new_basic.txt", 'w')
+        i = 0
+        c = 0
     
-    for l in test_file.readlines():
-        if replace_line[i] and results_given[i] != ():
-            new_line = "%s/|/%s/|/%s/|/%s\n"%(expected_results[i][0],
-                        expected_results[i][1], results_given[i][0], results_given[i][1])
-            new_tf.write(new_line)
-            c += 1
+        for l in test_file.readlines():
+            if replace_line[i] and results_given[i] != ():
+                new_line = "%s/|/%s/|/%s/|/%s\n"%(expected_results[i][0],
+                            expected_results[i][1], results_given[i][0], results_given[i][1])
+                new_tf.write(new_line)
+                c += 1
                
-        else:
-            new_tf.write(l)
+            else:
+                new_tf.write(l)
 
-        i += 1
+            i += 1
 
-    test_file.close()
-    new_tf.close()
+        test_file.close()
+        new_tf.close()
 
-    plurial = ''
-    if c > 1:
-        plurial = 's'
-    print("Replaced %d result%s"%(c,plurial))
+        plurial = ''
+        if c > 1:
+            plurial = 's'
+        print("Replaced %d result%s"%(c,plurial))
     
-    os.execlp("mv", "mv", "tests/new_basic.txt", "tests/basic.txt")
+        os.execlp("mv", "mv", "tests/new_basic.txt", "tests/basic.txt")

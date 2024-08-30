@@ -22,6 +22,7 @@ rule token = parse    (* la "fonction" aussi s'appelle token .. *)
   | '/'                    { DIV }
   | '='                    { EQUAL }
   | '>'                    { GREATER }
+  | '<'                    { LESS }
   | nombre as s            { INT (int_of_string s) }
   
   | '(' | "begin"          { LPAREN }
@@ -41,6 +42,11 @@ rule token = parse    (* la "fonction" aussi s'appelle token .. *)
   | "fun"                  { FUN }
   | "->"                   { MAPSTO }
   | "rec"                  { REC }
+
+  | "ref"                  { REF }
+  | ":="                   { REF_SET }
+  | '!'                    { REF_GET }
+  | ';'                    { SCOLON }
   
   | (lettre_minuscule | '_')+ (lettre | chiffre | '_' | '\'')* as s  { ID(s) }
 

@@ -18,6 +18,8 @@ let rec affiche_expr e =
   | Unary_op op ->
      begin match op with
      | Not -> print_string "Not"
+     | Ref -> print_string "Ref"
+     | Ref_get  -> print_string "Ref_get"
      | _ -> .
      end
 
@@ -35,6 +37,7 @@ let rec affiche_expr e =
      | Leq  -> print_string "Leq"
      | Or   -> print_string "Or"
      | And  -> print_string "And"
+     | Ref_set  -> print_string "Ref_set"
      | _ -> .
      end
 
@@ -64,6 +67,8 @@ let rec affiche_expr e =
        | _ -> raise (ToDo "msg err 0")
      end
 
+  | Seq l -> aff_aux "Seq(" l
+
   and aff_fun f =
     match f with
     | Fun(_, para, e) -> 
@@ -84,6 +89,7 @@ let rec affiche_expr e =
 ;;
 
 let rec affiche_expr_list l= match l with
+  (*Cette fonction sert a afficher la sequence de code fouine separes par ";;"*)
   | [e] -> affiche_expr e
   | e::r -> affiche_expr e; print_string ";; "; affiche_expr_list r
   | _ -> raise (ToDo "Cas impossible 1")
@@ -130,15 +136,15 @@ let build_fun_value fun_other_val_case value =
     definition.*)
 
   match value with
-  | Val_unit | Vc _ | Vb _ | Vf_una _ | Vf_bin _ -> fun_other_val_case value
-
   (*Si la fun est rec => on ajoute l'ajoute dans son envi_local. Sinon rien de special*)
   | Vf(recu, para, op, envi_local) ->
      begin
        match recu with
        | Non_rec -> value
        | Rec s -> Vf(recu, para, op, (s,value)::envi_local)
-     end;;
+     end
+    
+  | _ -> fun_other_val_case value;;
 
 let fun_id_if_rec recu = match recu with
   | Non_rec -> []
@@ -155,6 +161,8 @@ let rec eval e envi = match e with
   | Unary_op op->
      begin match op with
      | Not -> Vf_una val_not
+     | Ref  -> Vf_una fouine_ref_init
+     | Ref_get  -> Vf_una fouine_ref_get
      | _ -> .
      end
 
@@ -172,6 +180,7 @@ let rec eval e envi = match e with
      | Leq  -> Vf_bin val_leq
      | Or   -> Vf_bin val_or
      | And  -> Vf_bin val_and
+     | Ref_set  -> Vf_bin fouine_ref_set
      | _ -> .
      end
 
@@ -259,6 +268,8 @@ let rec eval e envi = match e with
          init_envi_local para e2 envi_local; init_envi_local para e3 envi_local]
 
        | Let_id(_,_,_) -> raise (ToDo "err de syntax")
+
+       | Seq l -> env_cat (List.map (fun e -> init_envi_local para e envi_local) l)
      in
      begin
        let envi_local = init_envi_local (id_cat [List.map string_of_id para; fun_id_if_rec recu ]) op [] in
@@ -292,11 +303,18 @@ let rec eval e envi = match e with
      | _ -> raise (NotAFunction 1)
      end
 
-  |Let_id(_,_,_) -> raise (ToDo "Syntax err")
+  | Let_id(_,_,_) -> raise (ToDo "Syntax err")
+
+  | Seq l ->
+     begin match l with
+     | [e] -> eval e envi
+     | e::r -> let _ = eval e envi in eval (Seq r) envi
+     | _ -> raise (ToDo "msg err seq vide")
+     end
 
 
 let rec seq_eval seq_e envi_global =
-  (*Cette fonction interprete le code fouine. Fait appel eval pour chaque code separes par ";;"
+  (*Cette fonction interprete le code fouine. Fait appel eval puis print_valeur pour chaque code separes par ";;"
     Entree : seq_e de type expr list et envi_global de type env
     Sortie : env*)
   let special_eval e envi =
@@ -323,11 +341,14 @@ let rec seq_eval seq_e envi_global =
     | _ -> ("-", eval e envi)
          
   in
-  begin
+  let process e =
+    let result = special_eval e envi_global in
+    print_result result; (result)::envi_global
+  in begin
     match seq_e with
-    | [e] -> (special_eval e envi_global)::envi_global
+    | [e] -> process e
 
-    | e::r -> seq_eval r ((special_eval e envi_global)::envi_global)
+    | e::r -> seq_eval r (process e)
 
     | _ -> raise (ToDo "Cas impossible 0")
   end

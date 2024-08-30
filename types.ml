@@ -1,9 +1,11 @@
 (* Definition du type rec_state. Indique si une fonction est rec ou non et stocke son id si elle l'est.*)
 type rec_state = Non_rec | Rec of string;;
 
+
 (* un type pour des expressions *)  
 type expr =
-    Const of int
+    Expr_unit
+  | Const of int
   | Bool of bool
 
   | Unary_op of (valeur -> valeur) term
@@ -16,14 +18,13 @@ type expr =
   | Let_id_in of rec_state * expr list * expr * expr
   | Fun of rec_state * expr list * expr
   | App of expr * expr
-  | Expr_unit
-
   | Let_id of rec_state * expr list * expr
 
+  | Seq of expr list
+            
 
-
+            
 (*Definition du type valeur et de ses operations*)
-
 and valeur =
     Val_unit
   | Vc of int
@@ -36,7 +37,12 @@ and valeur =
   | Vf_una of (valeur -> valeur)
   | Vf_bin of (valeur -> valeur -> valeur)
 
-and _ term=
+  | Vref of int
+
+          
+(*Pas convaincu des signatures. Uniquement type valeur donc bof mais oblige par la sortie de eval
+  de type valeur.*)
+and _ term =
   | Add  : (valeur -> valeur -> valeur) term
   | Mul  : (valeur -> valeur -> valeur) term
   | Min  : (valeur -> valeur -> valeur) term
@@ -52,10 +58,17 @@ and _ term=
   | Or   : (valeur -> valeur -> valeur) term
   | And  : (valeur -> valeur -> valeur) term
   | Not  : (valeur -> valeur) term
+
+  | Ref  : ('a -> valeur) term
+  | Ref_set : (valeur -> 'a -> valeur) term
+  | Ref_get : (valeur -> valeur) term
 ;;
+
 
 exception NotAllowedOperation
 exception ToDo of string
+exception NotExpectedType
+exception RefStorageIsFull
 
         
 let val_add a b = match a,b with
@@ -124,11 +137,61 @@ let bool_of_valeur a = match a with
 let string_of_id x = match x with
   | Id s -> s
   | Expr_unit -> "Unit" (*Solution temporaire. Pas d'id de ce nom car commence par une majuscule.*)
-  | _ -> raise (ToDo "msg err from types")
+  | _ -> raise (ToDo "msg err from types");;
 
+
+
+(*Definition du type fouine_ref -> un grand tableau pour implementer les ref avec un compteur.*)
+type fouine_ref = {tab : valeur array; mutable top : int};;
+
+let fouine_ref_tab_init () = {tab = Array.make 1024 Val_unit; top = 0};;
+
+let ref_storage = fouine_ref_tab_init ();;
+
+let fouine_ref_set f_ref v= match f_ref with
+  | Vref(id) -> ref_storage.tab.(id) <- v; Val_unit
+  | _ -> raise NotExpectedType;;
+
+let fouine_ref_get f_ref = match f_ref with
+  | Vref(id) -> ref_storage.tab.(id)
+  | _ -> raise NotExpectedType;;
+
+let fouine_ref_init v =
+  if ref_storage.top >= 1024 then raise RefStorageIsFull
+  else begin
+      let _ = fouine_ref_set (Vref(ref_storage.top)) v in
+      ref_storage.top <- ref_storage.top + 1;
+      Vref(ref_storage.top - 1)
+    end;;
+
+(*Fonctions utiles pour la construction de l'arbre par le parser. Elles servent a facto le code*)
+let seq_add e seq =
+  (*Cette fonction ajoute une expression a une sequence d'expression.*)
+  match seq with
+  | Seq(l) -> Seq(e::l)
+  | _ -> Seq(e::[seq]);;
+
+let build_let_id_in let_id in_expr =
+  match let_id with
+  | Let_id(recu, para, corps) -> Let_id_in(recu, para, corps, in_expr)
+  | _ -> raise NotAllowedOperation
+
+
+
+(*Fonctions d'affichage*)
 let print_bool b =
   if b then print_string "true"
   else print_string "false";;
+
+let rec raw_print_valeur a = match a with
+  | Val_unit -> print_string "()"
+  | Vc(k) -> print_int k
+  | Vb(b) -> print_bool b
+  | Vf(_,_,_,_) -> print_string "fun"
+  | Vf_una _ -> print_string "fun"
+  | Vf_bin _ -> print_string "fun"
+  | Vref _ -> print_string "{contents = "; raw_print_valeur (fouine_ref_get a); print_string "}";;
+
 
 let print_valeur a = match a with
   | Val_unit -> print_string "unit = ()"
@@ -136,13 +199,15 @@ let print_valeur a = match a with
   | Vb(b) -> print_string "bool = "; print_bool b
   | Vf(_,_,_,_) -> print_string "fun"
   | Vf_una _ -> print_string "fun"
-  | Vf_bin _ -> print_string "fun";;
+  | Vf_bin _ -> print_string "fun"
+  | Vref _ -> print_string "{contents = "; raw_print_valeur (fouine_ref_get a); print_string "}";;
 
 let print_result ele =
   if (fst ele) = "-" then print_string (fst ele)
   else (print_string "val "; print_string (fst ele));
   print_string " : "; print_valeur (snd ele); print_newline ()
 ;;
+
 
 let test =
   [val_add (Vc(1)) (Vc(2));
@@ -161,6 +226,8 @@ let test =
   val_and (Vb(true)) (Vb(true));
   val_not(Vb(true));
   val_not(Vb(false));];;
+
+
 
 (* Definition du type environemment *)
 (*type env = (string*valeur) list

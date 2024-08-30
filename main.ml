@@ -5,7 +5,7 @@ let interpret e =
   begin
     affiche_expr_list e;
     print_newline();
-    let _= List.map Types.print_result (List.rev (seq_eval e [])) in
+    let _= seq_eval e [] in
     print_newline()
   end
 
